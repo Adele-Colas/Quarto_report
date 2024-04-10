@@ -1,0 +1,181 @@
+---
+title: "Unveiling the link between Between Hygiene and Health Outcomes"
+subtitle: "A data-driven exploration of the correlation between Handwashing Access and Life Expectancy across the globe"
+author: "Adèle Colas"
+date: "2024-04-10"
+format: 
+  html:
+    theme: Solarized
+    toc: true
+execute: 
+  echo: false
+  warning: false
+  message: false
+lightbox: auto
+backgroundcolor: "#E0F2F1"
+
+---
+# What is this report about ?
+In a world focused on public health, access to basic hygiene facilities like handwashing remains a critical yet unaddressed issue. This report delves into the **potential relationship between a country's life expectancy and the proportion of its population lacking proper handwashing facilities** by leveraging data from countries across the globe.
+Through rigorous analysis of the *Unicef Metadata* and the *Unicef Indicator* files, this study seek to determine **whether limited handwashing facilities access contributes to lower life expectancy**, highlighting the potential impact of improved hygiene infrastructure on global health outcomes.
+
+```{r}
+#| label: setup
+#| include: false
+
+# libraries
+library(tidyverse)
+library(RColorBrewer)
+library(plotly)
+
+# data
+unicef_metadata <- read_delim("unicef_metadata.csv", 
+                              delim = ";", escape_double = FALSE, trim_ws = TRUE)
+unicef_indicator_1 <- read_delim("unicef_indicator_1.2.csv", 
+                                   delim = ";", escape_double = FALSE, trim_ws = TRUE)
+localisation <- read_delim("localisation.csv", 
+                           delim = ";", escape_double = FALSE, trim_ws = TRUE)
+
+# transformations
+data_join <- unicef_metadata %>%
+  left_join(unicef_indicator_1) %>%
+  left_join(localisation)
+```
+
+# Exploring Global Life Expectancy
+
+```{r}
+#| fig-cap: This detailed map provides a snapshot of life expectancy accross the world in 1960, highlighting **major gaps between countries**. It then appears interesting to see how it has evolved through the years by having a look at 2020's world life exepctancy. 
+#| 
+indicator_data_1960 <- unicef_metadata %>%
+  filter(year==1960)
+
+map_world <- map_data("world")
+map_world$region <- as.character(map_world$region)
+map_world$region[map_world$region == "USA"] <- "United States"
+map_world$region[map_world$region == "UK"] <- "United Kingdom"
+map_world$region[map_world$region == "Republic of Congo"] <- "Republic of the Congo"
+map_world$region[map_world$region == "Democratic Republic of the Congo"] <- "Congo"
+map_data_join <- full_join(indicator_data_1960,map_world, by=c("country"="region"))
+
+ggplot(map_data_join) +
+  aes(x = long, y = lat, group = group, fill=lifeExp) +
+  geom_polygon() +
+  labs(title = "Life Expectancy in 1960", fill = "Life Expectancy") +
+  theme_linedraw() +
+  scale_fill_distiller(palette = "Spectral",direction = 1)
+options(scipen=999)
+```
+
+```{r}
+#| fig-cap: This map shows the 2020's world life expectancy. We can easily notice **an increase of life expecancy all over the globe** with an **average life expectancy increased from 30 to 60 years**. However, we can also observe that the regions with a hight life expectancy remains mostly the same such as countries in Europe or Oceania.Therefore, **gaps between countries remains important**.
+#| 
+indicator_data_2020 <- unicef_metadata %>%
+  filter(year==2020)
+
+map_world <- map_data("world")
+map_world$region <- as.character(map_world$region)
+map_world$region[map_world$region == "USA"] <- "United States"
+map_world$region[map_world$region == "UK"] <- "United Kingdom"
+map_world$region[map_world$region == "Republic of Congo"] <- "Republic of the Congo"
+map_world$region[map_world$region == "Democratic Republic of the Congo"] <- "Congo"
+map_data_join_2 <- full_join(indicator_data_2020,map_world, by=c("country"="region"))
+
+ggplot(map_data_join_2) +
+  aes(x = long, y = lat, group = group, fill=lifeExp) +
+  geom_polygon() +
+  labs(title = "Life Expectancy in 2020", fill = "Life Expectancy") +
+  theme_linedraw() +
+  scale_fill_distiller(palette = "Spectral",direction = 1)
+options(scipen=999)
+
+```
+
+
+# The Evolution of Life Expenctancy by Continent over the years
+
+```{r}
+#| fig-cap: This time serie plot shows the evolution of life expectancy by continent over the years. We can notice a **general tendancy of improvement in the life expectancy**. However, we can observe the same gaps as with the previous vizualisations. It allows to observe this tendancy at a larger scale by comparing the life expectancy between continents and therefore, **generalize the correlation established at a continent level**.
+#|
+
+timeseries_plot_1 <- data_join %>%
+  ggplot() +
+  aes(year, lifeExp, group=country, color=Region) +
+  geom_line() +
+  labs(
+    title = "Evolution of life expectancy by continent over the years",
+    x= "Year",
+    y= "Life Expectancy",
+    color= "Continent"
+  ) +
+    theme_classic()
+
+
+ggplotly(timeseries_plot_1)
+
+```
+
+# Unraveling the link between Life Expectancy and Limited Acess to Handwashing Facilities
+
+```{r}
+#| fig-cap: This scatter plot highlights the relation between life expectancy and countries' limited access to handwashing facility. It shows that **the more limited access to hand washing facilities a country has, the lower the life expectancy is**. Even though life expectancy is increasing by the years, this relation remains the same.
+#| 
+data_filtered <- subset(data_join, year %in% c(2000, 2004, 2008, 2012, 2016, 2020))
+
+ggplot(data_filtered) +
+  aes(prop_of_pop_with_limited_handwashing_facility, lifeExp, color=Region,size=prop_of_pop_with_limited_handwashing_facility) +
+  geom_point(alpha=0.5) +
+  facet_wrap(~year) +
+  scale_x_continuous(limits= c(0, 100), breaks = c(20, 40, 60,80), labels = c("20%", "40%", "60%","80%")) +
+  labs(x = "Proportion of pop with limited handwashing facility", y = "Life Expectancy", 
+       color = "Continent", 
+       size = "Proportion", 
+       title= "Evolution of the relation between Life expectancy and Limited access to handwashing facility") +
+  theme_classic()
+
+```
+
+```{r}
+#| fig-cap: This bar chart aims to **showcast the average life expectancy of each continent to confirm the observations made** in the previous vizualizations. We can confirm here that Africa is the continent with the lower life expectancy. We will have a look at the proportion of population with limited acess to hand washing facilities by continent right after to see if the correlation is confirmed.
+#|  
+data_join %>%
+  group_by(Region) %>%
+  summarize(m_lifeExp = (mean(lifeExp, na.rm = TRUE))) %>%
+  ggplot() +
+  aes(Region, m_lifeExp, fill= Region) +
+  geom_col() +
+  scale_fill_brewer(palette = "Paired") +
+  theme_classic() +
+  labs(x="Continent", y="Average Life Expectancy",
+       fill="Continent",
+    title= "Average life expectancy per continent")
+  
+```
+
+
+```{r}
+#| fig-cap: With this bar chart, we can see that the continent with the highest proportion of population with limited access to hand washing facilities is Africa. On the other hand, the lowest proportion is Europe which is alos the continent with the highest life expectancy, as we observed in the previous bar chart. Therefore, we can **confirm the high correlation between life expectancy and the proportion of population with limited acess to handwashing facilities.**
+#|  
+m_Pop_Proportion <- unicef_indicator_1 %>%
+  group_by(country) 
+
+world <- inner_join(localisation, m_Pop_Proportion, by = "country") # Assuming "country" is the join key
+
+m_pop_world <- world %>%
+  group_by(Region) %>%
+  summarize(m_Pop_Proportion = (mean(prop_of_pop_with_limited_handwashing_facility, na.rm = TRUE)))
+  
+ggplot(m_pop_world) +
+  aes(Region, m_Pop_Proportion, fill = Region) +
+  geom_col() +
+  scale_fill_brewer(palette = "Paired") +
+  theme_classic() +
+  labs(x="Continent", y="Average proportion of population",
+       fill="Continent",
+    title = "Average proportion of population with limited access to hand washing facilities per region")
+
+```
+
+# Conclusion and Recommendations
+Our analysis has conclusively demonstrated a **strong correlation between life expectancy and the proportion of a population with limited access to handwashing facilities**. This correlation is evident across countries, with higher life expectancies consistently associated with greater access to handwashing facilities. This finding **reinforces the critical importance of hygiene in promoting public health and improving overall health outcomes.**
+Collaborative efforts between countries and organizations are crucial to **sharing knowledge, resources, and best practices in promoting handwashing access**. This could help accelerate progress towards achieving universal handwashing goals and **improving global life expectancy.**
